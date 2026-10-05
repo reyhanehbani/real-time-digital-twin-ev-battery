@@ -1,0 +1,35 @@
+# IDE / Editor
+.vscode/
+.idea/
+
+# Build files
+build/
+bin/
+obj/
+
+# Compiled files
+*.exe
+*.dll
+*.so
+*.o
+*.a
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Environment / Secrets
+.env
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
