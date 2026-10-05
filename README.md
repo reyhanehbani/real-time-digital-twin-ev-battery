@@ -16,3 +16,4 @@ The system integrates:
 - Web-based monitoring
 
 ## Project Status
+Day 0 - Project Definition
