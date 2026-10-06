@@ -2,257 +2,47 @@
 
 ## Project Title
 
-**Real-Time Digital Twin of a 355-V-Class Li-ion EV Battery Pack with C++ EKF State Estimation, IIoT/MQTT Communication, Secure Industrial HMI, and Web-Based Monitoring**
+**BMS-Oriented Real-Time Digital Twin of a 355-V-Class Li-ion EV Battery Pack with C++ EKF State Estimation, IIoT/MQTT Communication, Secure Industrial HMI, and Web-Based Monitoring**
 
 ---
 
 # 1. Problem Statement
 
-Lithium-ion battery packs are one of the core systems in modern electric vehicles. Their condition directly affects vehicle performance, energy consumption, reliability, and operational safety. During real driving, the battery is constantly exposed to changing operating conditions. For example, current and power demand can rise quickly during acceleration, remain relatively steady while cruising, drop during idle periods, and even reverse direction during regenerative braking.
+Lithium-ion battery packs are one of the most critical systems in modern electric vehicles. Their condition directly affects vehicle performance, energy consumption, reliability, and operational safety.
 
-Although quantities such as pack voltage, current, and temperature can be measured directly, important internal battery states cannot be observed in the same way. **State of Charge (SOC)** is one of the most important examples. It has to be estimated from available measurements and an appropriate battery model.
+A **Battery Management System (BMS)** is responsible for continuously monitoring the battery and estimating internal states that cannot be measured directly. Important BMS functions include battery voltage, current, and temperature monitoring, State of Charge (SOC) estimation, state monitoring, abnormal-condition detection, alarm management, and safe operating supervision.
 
-A straightforward method such as Coulomb Counting can be useful for estimating SOC, but its error can accumulate over time. Its accuracy also depends strongly on the quality of the current measurement and on the initial SOC. In a real EV scenario, this limitation becomes more visible because the battery is rarely operating under a constant load. A meaningful test should therefore expose the model and estimator to realistic changes in power demand instead of relying mainly on randomly generated current data.
+During real EV operation, the battery is exposed to continuously changing operating conditions. Current and power demand can increase rapidly during acceleration, remain relatively stable during cruising, decrease during idle periods, and reverse direction during regenerative braking.
 
-For this reason, the proposed system will use a **driving-cycle-based input**, so that the battery is tested under a sequence that resembles actual vehicle operation. A selected standard or representative drive cycle will first define vehicle speed. Vehicle speed will then be used to determine the required traction power and, consequently, the battery current. This produces a much more realistic operating sequence, including acceleration, cruising, braking, idle periods, and changes in load.
+Although quantities such as pack voltage, current, and temperature can be measured directly, important internal battery states cannot be observed in the same way. **State of Charge (SOC)** is one of the most important examples. Therefore, a BMS requires a suitable battery model and state-estimation algorithm to determine the internal state of the battery from available measurements.
 
-Regenerative braking is another important part of an EV-oriented battery model. During braking, part of the vehicle's kinetic energy can be recovered and returned to the battery. Depending on the selected sign convention, this appears as negative battery current. The model therefore needs to represent both battery discharge and regenerative charging, rather than treating current as a one-way input.
+A straightforward method such as Coulomb Counting can provide an SOC estimate, but its error can accumulate over time and its accuracy depends strongly on current measurement quality and initial SOC. A more robust BMS-oriented approach is therefore required.
 
-However, obtaining an SOC estimate is not enough on its own. The estimator also needs to be tested under conditions that show how it behaves in practice. An EKF may perform well when its initial state is already close to the actual state. A stronger evaluation should therefore also test an incorrect initial SOC, noisy measurements, and other controlled disturbances. The resulting estimate can then be evaluated quantitatively using metrics such as **MAE, RMSE, maximum error, and convergence time**.
+For this reason, the proposed system will implement a **model-based battery state estimation subsystem using an Extended Kalman Filter (EKF)**. The EKF will operate in real time and estimate the battery state from voltage, current, and other available measurements.
 
-The uncertainty information produced by the EKF is also useful. Instead of showing only a number such as `SOC = 84.2%`, the monitoring system should also give the operator an understandable indication of how uncertain that estimate is. This information can be derived from the EKF covariance and represented on the dashboard as an uncertainty or estimation-confidence indicator. The goal is therefore to show both what the estimator believes and how much uncertainty is associated with that estimate.
-
-The system should also demonstrate how a real monitoring architecture behaves when something goes wrong. Because this project is a software prototype and does not require physical battery hardware, controlled **fault injection** will be used to reproduce abnormal conditions in a repeatable way. Examples include voltage sensor noise, sensor bias, abnormal temperature, cell-voltage deviation or imbalance, and communication loss. These scenarios will feed into the alarm-management layer, allowing abnormal conditions to be detected, classified, and clearly presented to the operator.
-
-From a system-integration perspective, the battery model, estimator, Digital Twin, communication layer, HMI, and web application should work as parts of one connected system rather than as isolated software components. Together, they should form a single real-time data pipeline.
-
-The proposed architecture is therefore based on the following flow:
-
-**Driving Cycle → Vehicle Speed → Power Demand → Battery Current → Battery Model → EKF → Digital Twin → MQTT/IIoT → HMI/Web Monitoring**
-
-At the pack level, the system will use an **Equivalent Pack Model** for the main real-time EKF to keep the computational load manageable. At the same time, the Digital Twin will preserve the higher-level structure of the system:
-
-**Cell → Module → Pack → Vehicle**
-
-This makes it possible to represent selected cell-level information for tasks such as imbalance detection, minimum/maximum cell-voltage monitoring, and abnormal-cell scenarios, without making the first version unnecessarily heavy by implementing a detailed electrochemical model for every cell.
-
-The Digital Twin will also have two complementary operating modes.
-
-In **Live Twin** mode, the system continuously processes incoming simulation or battery data and updates the digital representation in real time.
-
-In **Analytical Twin** mode, the system can be used for comparison and analysis, such as:
-
-**Actual SOC vs. Estimated SOC**
-
-and
-
-**Measured Voltage vs. Predicted Voltage**
-
-This makes the Digital Twin more than a graphical representation of the battery. It becomes a software model that can follow the system while it is running and also support analysis during or after a run.
-
-Finally, the monitoring architecture should not be purely passive. In addition to displaying telemetry, the web interface should be able to send controlled simulation commands—for example, starting or stopping a scenario, resetting the system, or selecting a different drive cycle. Before reaching the simulator, these commands must pass through authentication, validation, authorization, and the MQTT communication layer.
-
-The main engineering problem of this project can therefore be stated as:
-
-> **How can a real-time, connected, and secure Digital Twin be designed and implemented for a 355-V-class Li-ion EV battery pack so that realistic driving-cycle data can be converted into battery operating conditions, battery states can be estimated with a C++ EKF, estimator uncertainty and faults can be monitored, and the resulting information can be communicated, analyzed, and controlled through industrial and web-based interfaces?**
-
----
-
-# 2. Objective
-
-## 2.1. Primary Objective
-
-The primary objective of this project is to design and implement a **working real-time Digital Twin prototype for a 355-V-class Li-ion EV battery pack** that can be demonstrated, tested, and measured end to end.
-
-The final system should reproduce a realistic battery operating scenario, estimate the battery state in real time, maintain a synchronized digital representation of the pack, exchange data through MQTT, detect selected abnormal conditions, and provide both operator-oriented and web-based monitoring.
-
-The project is intended to demonstrate a complete engineering pipeline, not simply a standalone EKF or a standalone dashboard:
-
-**Drive Cycle → Vehicle Model Inputs → Battery Model → C++ EKF → Digital Twin → MQTT/IIoT → Secure HMI/Web Dashboard**
-
-The system should also support controlled commands and repeatable demonstrations through simulation recording and replay.
-
-## 2.2. Technical Objectives
-
-The project will address the following technical objectives.
-
-### 1. Develop a realistic EV operating input
-
-Instead of generating battery current randomly, the system will use a driving cycle or another representative EV driving profile.
-
-The input chain will be:
+The battery will not be tested using only randomly generated current data. Instead, the system will use a **driving-cycle-based operating scenario**:
 
 **Driving Cycle → Vehicle Speed → Power Demand → Battery Current**
 
-The resulting battery current will expose the model to acceleration, cruising, braking, idle conditions, and varying load.
+This produces a more realistic battery operating sequence containing acceleration, cruising, braking, idle periods, and changing load conditions.
 
-### 2. Model regenerative braking
+Regenerative braking will also be represented. During braking, part of the vehicle's kinetic energy can be recovered and returned to the battery. Depending on the selected sign convention, regenerative braking appears as negative battery current. The battery model must therefore represent both discharge and regenerative charging.
 
-The battery model will support both charging and discharging behavior.
+The project is primarily a **BMS-oriented software and simulation prototype** rather than a physical BMS hardware implementation. The BMS core will be responsible for battery measurement processing, state estimation, abnormal-condition detection, and battery-state monitoring.
 
-During normal traction:
-
-**Battery → Vehicle**
-
-During regenerative braking:
-
-**Vehicle → Battery**
-
-The model must therefore allow negative battery current where the selected convention represents regenerative charging.
-
-### 3. Develop the battery electrical model
-
-A suitable electrical/mathematical battery model will be developed to represent the relevant dynamic behavior of the 355-V-class pack.
-
-The model should provide the quantities required by the estimator and monitoring system while remaining simple enough for real-time execution.
-
-### 4. Define the battery state variables
-
-The state vector required by the selected model will be defined, with **SOC as the primary state of interest**.
-
-Additional internal/model states will be included when they are required by the chosen equivalent-circuit model.
-
-### 5. Implement a C++ Extended Kalman Filter
-
-An **EKF will be formulated and implemented in C++** for real-time state estimation.
-
-The implementation will include:
-
-- State prediction
-- Covariance prediction
-- Measurement update
-- Gain calculation
-- State correction
-- Covariance update
-- Initialization and reset
-- Real-time execution
-
-### 6. Evaluate EKF behavior under controlled scenarios
-
-The estimator will not be judged using only one ideal test case.
-
-At least the following scenarios will be considered:
-
-**Scenario A — Correct Initial SOC**
-
-Actual SOC = 80%
-Initial EKF SOC = 80%
-
-**Scenario B — Incorrect Initial SOC**
-
-Actual SOC = 80%
-Initial EKF SOC = 60%
-
-**Scenario C — Noisy Measurements**
-
-Voltage and/or current measurements include controlled measurement noise.
-
-Additional scenarios may be introduced when useful, including sensor bias, changing temperature, or other model mismatch conditions.
-
-The evaluation will consider:
-
-- MAE
-- RMSE
-- Maximum absolute error
-- Convergence time
-- Estimator response under changing operating conditions
-
-### 7. Use EKF covariance as an uncertainty indicator
-
-The system will retain relevant covariance information from the EKF.
-
-For example:
-
-`cov_trace`
-
-can be used as one of the signals for an uncertainty indicator.
-
-The dashboard will therefore show not only the estimated SOC but also an indication of the associated estimation uncertainty, using a clearly defined interpretation rather than presenting an unsupported numerical "confidence percentage."
-
-### 8. Build a hierarchical battery representation
-
-The Digital Twin architecture will conceptually represent the battery as:
+The system will use an **Equivalent Pack Model** for the main real-time EKF to maintain manageable computational complexity. At the same time, the battery architecture will preserve the conceptual hierarchy:
 
 **Cell → Module → Pack → Vehicle**
 
-The main EKF will initially operate on an **Equivalent Pack Model**.
-
-Selected cell-level variables will still be represented for monitoring and fault scenarios, including:
+Selected cell-level information will be represented for BMS monitoring functions such as:
 
 - Minimum cell voltage
 - Maximum cell voltage
-- Cell voltage spread
+- Cell-voltage spread
 - Cell imbalance
 - Abnormal cell identification
 
-This approach keeps the real-time estimation problem manageable while preserving a meaningful EV battery architecture.
-
-### 9. Build the Digital Twin
-
-The Digital Twin will continuously synchronize with the incoming battery data and estimator outputs.
-
-It should represent:
-
-- Current battery operating condition
-- SOC
-- Internal/model states
-- Voltage and current behavior
-- Temperature
-- Cell/module/pack information where available
-- Estimation uncertainty
-- Fault and alarm status
-
-### 10. Provide two Digital Twin modes
-
-The system will support two main modes.
-
-**Live Twin**
-
-Real-time operation:
-
-**Simulation/Data Source → EKF → MQTT → Digital Twin → Monitoring**
-
-**Analytical Twin**
-
-Analysis and comparison of:
-
-- Actual SOC vs. Estimated SOC
-- Measured Voltage vs. Predicted Voltage
-- Estimation error
-- Estimator uncertainty
-- System response during selected events
-
-### 11. Implement IIoT communication using MQTT
-
-MQTT will be the primary messaging layer.
-
-The communication architecture will include:
-
-- MQTT Broker
-- Publisher/Subscriber structure
-- Telemetry topics
-- State-estimation topics
-- Alarm/fault topics
-- Command topics
-- Command acknowledgement topics
-- Defined payload structures
-- Update rates
-- Connection monitoring
-- Reconnection handling
-
-A representative topic structure may include:
-
-`riri/bms/telemetry`
-
-`riri/bms/command`
-
-`riri/bms/command/ack`
-
-with the final namespace and topic hierarchy being defined during implementation.
-
-### 12. Implement fault injection
-
-The system will support controlled fault scenarios without requiring physical battery faults.
+The BMS will also be evaluated under controlled abnormal scenarios. Because this project does not require physical high-voltage battery hardware, **fault injection** will be used to reproduce abnormal conditions in a repeatable software environment.
 
 Examples include:
 
@@ -262,16 +52,303 @@ Examples include:
 - Abnormally high temperature
 - Cell over-voltage
 - Cell under-voltage
-- Excessive cell-voltage difference
 - Cell imbalance
+- Excessive cell-voltage difference
 - Communication loss
+
+The BMS monitoring and fault-management layers will classify abnormal conditions and provide appropriate alarms.
+
+The project will then extend the BMS through a **Digital Twin layer**. The Digital Twin will maintain a synchronized software representation of the battery and BMS state, allowing the system to operate in real time and support analytical comparison after or during a run.
+
+The complete architecture therefore consists of a BMS core surrounded by Digital Twin, communication, monitoring, and application layers:
+
+**EV Operating Scenario → Battery Model → BMS Measurement Layer → BMS State Estimation → BMS Fault Management → Digital Twin → MQTT/IIoT → HMI/Web Monitoring**
+
+The system should also provide controlled simulation commands through a secure communication path. Commands such as starting or stopping a simulation, resetting the system, selecting a drive cycle, or starting replay must pass through authentication, validation, authorization, and MQTT communication before reaching the simulator.
+
+The main engineering problem can therefore be stated as:
+
+> **How can a real-time BMS-oriented system be designed and implemented for a 355-V-class Li-ion EV battery pack so that realistic driving-cycle data can be converted into battery operating conditions, battery states can be estimated using a C++ EKF, battery abnormalities can be detected and classified, and the resulting BMS state can be synchronized through a Digital Twin and communicated to secure industrial and web-based monitoring interfaces?**
+
+---
+
+# 2. Objective
+
+## 2.1. Primary Objective
+
+The primary objective of this project is to design and implement a **working real-time BMS-oriented Digital Twin prototype for a 355-V-class Li-ion EV battery pack**.
+
+The system will reproduce realistic EV battery operating conditions, monitor battery measurements, estimate battery states in real time, detect selected abnormal conditions, maintain a synchronized Digital Twin, exchange information through MQTT, and provide operator-oriented and web-based monitoring.
+
+The project is therefore not intended to be only an EKF implementation or only a Digital Twin visualization.
+
+The core engineering pipeline is:
+
+**Driving Cycle → Vehicle/Power Model → Battery Model → BMS Measurements → C++ EKF → BMS State & Fault Management → Digital Twin → MQTT/IIoT → HMI/Web Dashboard**
+
+The project will demonstrate how the core functions of a software-based BMS can be integrated into a complete real-time engineering system.
+
+---
+
+## 2.2. BMS-Centered Technical Objectives
+
+### 1. Develop a realistic EV operating input
+
+The system will use a driving cycle or representative EV driving profile rather than random battery current.
+
+The input chain will be:
+
+**Driving Cycle → Vehicle Speed → Power Demand → Battery Current**
+
+---
+
+### 2. Develop the battery pack model
+
+A suitable electrical/mathematical model will be developed for a 355-V-class Li-ion battery pack.
+
+The model must provide the measurements and internal states required by the BMS estimator and monitoring system.
+
+---
+
+### 3. Implement BMS measurement processing
+
+The BMS measurement layer will process the primary battery measurements:
+
+- Pack voltage
+- Pack current
+- Temperature
+- Cell voltages where available
+
+These measurements will provide the inputs required by the BMS state-estimation and fault-management functions.
+
+---
+
+### 4. Implement SOC estimation
+
+**State of Charge (SOC)** will be the primary estimated battery state.
+
+The system will use a model-based estimation approach rather than relying only on Coulomb Counting.
+
+---
+
+### 5. Implement a C++ Extended Kalman Filter
+
+An **EKF will be formulated and implemented in C++** for real-time battery state estimation.
+
+The implementation will include:
+
+- State prediction
+- Covariance prediction
+- Measurement update
+- Gain calculation
+- State correction
+- Covariance update
+- Initialization
+- Reset
+- Real-time execution
+
+The EKF will constitute one of the core computational components of the BMS.
+
+---
+
+### 6. Evaluate EKF performance
+
+The estimator will be evaluated using controlled scenarios rather than only an ideal operating condition.
+
+At minimum:
+
+**Scenario A — Correct Initial SOC**
+
+Actual SOC = 80%
+
+Initial EKF SOC = 80%
+
+**Scenario B — Incorrect Initial SOC**
+
+Actual SOC = 80%
+
+Initial EKF SOC = 60%
+
+**Scenario C — Noisy Measurements**
+
+Voltage and/or current measurements contain controlled noise.
+
+Performance will be evaluated using:
+
+- MAE
+- RMSE
+- Maximum absolute error
+- Convergence time
+- Response under changing operating conditions
+
+---
+
+### 7. Implement estimation uncertainty monitoring
+
+The BMS will retain relevant EKF covariance information.
+
+For example:
+
+`cov_trace`
+
+may be used as an indicator of estimator uncertainty.
+
+The monitoring system will therefore show both:
+
+**Estimated SOC**
+
+and
+
+**Estimation Uncertainty**
+
+The system will not present covariance directly as a numerical confidence percentage without an appropriate statistical interpretation.
+
+---
+
+### 8. Implement BMS battery monitoring
+
+The BMS monitoring subsystem will continuously track:
+
+- Pack voltage
+- Pack current
+- Temperature
+- SOC
+- Minimum cell voltage
+- Maximum cell voltage
+- Cell-voltage spread
+- Cell imbalance
+- Relevant battery-model states
+
+This monitoring layer forms the primary interface between the battery model and the higher-level Digital Twin.
+
+---
+
+### 9. Implement battery fault detection
+
+The BMS will detect selected abnormal conditions including:
+
+- Over-voltage
+- Under-voltage
+- Over-temperature
+- Excessive current
+- Cell imbalance
+- Abnormal cell voltage
+- Excessive voltage spread
+- Sensor abnormalities
+- Communication abnormalities
+
+The fault-management system will classify detected conditions and generate alarms.
+
+---
+
+### 10. Implement a hierarchical battery representation
+
+The Digital Twin and BMS architecture will conceptually represent:
+
+**Cell → Module → Pack → Vehicle**
+
+The primary real-time EKF will initially operate on an **Equivalent Pack Model**.
+
+Selected cell-level variables will still be represented for BMS monitoring and fault scenarios.
+
+---
+
+### 11. Build the Digital Twin
+
+The Digital Twin will provide a synchronized software representation of the battery and BMS state.
+
+It will represent:
+
+- Current battery operating condition
+- SOC
+- Internal/model states
+- Voltage
+- Current
+- Temperature
+- Cell/module/pack information where available
+- Estimation uncertainty
+- Fault status
+- Alarm status
+- BMS operating state
+
+The Digital Twin is therefore an extension of the BMS rather than a replacement for it.
+
+---
+
+### 12. Provide Live and Analytical Twin modes
+
+**Live Twin**
+
+The system follows the BMS and battery state in real time:
+
+**Battery Model → BMS → Digital Twin → Monitoring**
+
+**Analytical Twin**
+
+The system supports comparison and post-run analysis such as:
+
+- Actual SOC vs. Estimated SOC
+- Measured Voltage vs. Predicted Voltage
+- Estimation Error
+- Estimation Uncertainty
+- Battery response during selected events
+
+---
+
+### 13. Implement IIoT communication using MQTT
+
+MQTT will provide the communication layer between the BMS/Digital Twin and higher-level applications.
+
+The communication architecture will include:
+
+- MQTT Broker
+- Publisher/Subscriber structure
+- Telemetry topics
+- BMS state-estimation topics
+- Alarm/fault topics
+- Command topics
+- Command acknowledgement topics
+- Connection monitoring
+- Reconnection handling
+
+Representative topics may include:
+
+`riri/bms/telemetry`
+
+`riri/bms/state`
+
+`riri/bms/alarm`
+
+`riri/bms/command`
+
+`riri/bms/command/ack`
+
+---
+
+### 14. Implement fault injection
+
+Controlled fault scenarios will be introduced without physical battery faults.
+
+Examples:
+
+- Voltage sensor noise
+- Current sensor noise
+- Sensor bias
+- High temperature
+- Cell over-voltage
+- Cell under-voltage
+- Cell imbalance
+- Abnormal cell voltage
+- Excessive voltage spread
 - MQTT disconnection
 
-Faults will be introduced in a controlled and repeatable way so that their effect on the estimator, Digital Twin, communication layer, and HMI can be evaluated.
+The purpose is to evaluate BMS detection, alarm management, Digital Twin behavior, communication, and HMI response.
 
-### 13. Implement alarm management
+---
 
-The monitoring system will classify detected conditions into three clear severity levels:
+### 15. Implement BMS alarm management
+
+The alarm-management subsystem will classify conditions into:
 
 **NORMAL**
 
@@ -279,82 +356,91 @@ The monitoring system will classify detected conditions into three clear severit
 
 **CRITICAL**
 
-Examples include high temperature as a warning condition and cell over-voltage or communication failure as critical conditions when the configured limits are exceeded.
+Each alarm should contain relevant information such as:
 
-The alarm layer should provide:
-
-- Alarm detection
-- Severity classification
-- Active-alarm indication
-- Alarm message
-- Relevant measurement
+- Alarm source
+- Severity
+- Measurement
 - Timestamp
-- State change/update
+- Current condition
+- State change
 - Acknowledgement where appropriate
 
-### 14. Develop a secure industrial HMI
+---
 
-The industrial HMI will be designed around the principles of **High-Performance HMI**, with reference to the **ANSI/ISA-101** approach used for industrial HMI design.
+### 16. Develop a secure industrial HMI
 
-The design will prioritize:
+The industrial HMI will provide operator-level visibility into the BMS.
 
-- Clear hierarchy
-- Low visual clutter
-- Consistent navigation
-- Trend visualization
-- Alarm prioritization
-- Strong indication of abnormal conditions
-- Minimal decorative elements
-- Consistent interaction patterns
+It will display information such as:
 
-The HMI should help an operator recognize abnormal behavior quickly; visual attractiveness is secondary to clarity and usability.
-
-### 15. Develop a web-based monitoring dashboard
-
-The web application will provide remote monitoring of the system.
-
-The dashboard will include, as appropriate:
-
-- SOC
-- SOC uncertainty indicator
 - Pack voltage
 - Pack current
 - Temperature
-- Cell minimum/maximum voltage
-- Cell imbalance information
-- System status
+- SOC
+- SOC uncertainty
+- Minimum/maximum cell voltage
+- Cell imbalance
+- BMS status
+- Fault status
+- Active alarms
+- Communication status
+- EKF outputs
+
+The HMI will follow High-Performance HMI principles and prioritize clarity and abnormal-condition visibility over decorative design.
+
+---
+
+### 17. Develop a web-based BMS monitoring dashboard
+
+The web application will provide remote monitoring of the BMS and Digital Twin.
+
+The dashboard may include:
+
+- SOC
+- SOC uncertainty
+- Pack voltage
+- Pack current
+- Temperature
+- Minimum/maximum cell voltage
+- Cell imbalance
+- BMS state
 - Active alarms
 - Time-series trends
 - EKF performance
-- Actual vs. estimated comparison
+- Actual vs. estimated SOC
 - Measured vs. predicted voltage
 - Communication status
+- Historical data
 
-### 16. Add Live and Replay modes
+---
+
+### 18. Add Live and Replay modes
 
 The monitoring system will support:
 
 **LIVE MODE**
 
-for real-time operation, and
+Real-time BMS operation.
 
 **REPLAY MODE**
 
-for playback of previously recorded simulation runs.
+Playback of previously recorded BMS/simulation data.
 
-A recorded scenario such as:
+Replay will support:
 
-`Drive Cycle #01`
+- Demonstration
+- Repeatable testing
+- Debugging
+- Algorithm comparison
+- HMI testing
+- Communication testing
 
-can later be loaded and streamed again so that the same data flow is reproduced through the Digital Twin and dashboard.
+---
 
-The replay capability will make demonstrations repeatable and will also provide a practical way to compare different estimator settings and system versions.
+### 19. Add controlled simulation commands
 
-### 17. Add controlled simulation commands
-
-The web interface will not be limited to passive visualization.
-
-Selected commands may include:
+The web interface may provide controlled simulation commands:
 
 - Start Simulation
 - Stop Simulation
@@ -363,7 +449,7 @@ Selected commands may include:
 - Start Replay
 - Stop Replay
 
-The command path will follow:
+The command path will be:
 
 **Web UI**
 
@@ -387,42 +473,46 @@ The command path will follow:
 
 **Simulator**
 
-Commands should be restricted to explicitly permitted operations and should not bypass the system's control and validation layers.
+The command system will not directly control physical high-voltage equipment.
 
-### 18. Implement basic cybersecurity mechanisms
+---
 
-Security will be treated as an actual part of the system architecture, not merely as a section in the documentation.
+### 20. Implement prototype-level cybersecurity
 
-The prototype will consider mechanisms such as:
+The project will consider:
 
 - Client authentication
 - TLS-protected MQTT communication
 - MQTT ACLs
-- WSS for web communication where applicable
+- WSS where applicable
 - Command authorization
 - Payload validation
-- Controlled access to configuration and command functions
 
-The security implementation will remain appropriate to a prototype environment and will not be presented as production automotive cybersecurity certification.
+These mechanisms are intended for the engineering prototype and will not be presented as production automotive cybersecurity certification.
 
-### 19. Validate the end-to-end system
+---
 
-The final system will be tested as one connected architecture rather than as a collection of independent modules.
+### 21. Validate the complete BMS-oriented architecture
+
+The final system will be validated as one connected architecture.
 
 Validation will consider:
 
-- Estimation accuracy
-- Convergence behavior
+- SOC estimation accuracy
+- EKF convergence
 - Real-time response
 - Drive-cycle response
-- Regenerative braking behavior
-- Fault response
+- Regenerative braking
+- Battery monitoring
+- Fault detection
 - Alarm response
+- Cell imbalance detection
 - Communication reliability
 - Digital Twin synchronization
 - Replay consistency
 - Command-path behavior
-- Monitoring performance
+- HMI performance
+- Web monitoring
 - Security controls
 
 ---
@@ -433,47 +523,73 @@ Validation will consider:
 
 ### A. EV Driving Cycle and Operating Scenario
 
-The project will include a driving-cycle-based source for generating realistic battery operating conditions.
+The project will use a driving-cycle-based source for realistic battery operating conditions.
 
-The general flow will be:
+**Driving Cycle → Vehicle Speed → Power Demand → Battery Current → Battery Pack**
 
-**Driving Cycle**
-
-↓
-
-**Vehicle Speed**
-
-↓
-
-**Power Demand**
-
-↓
-
-**Battery Current**
-
-↓
-
-**Battery Pack Model**
-
-The selected cycle will include representative operating regions such as:
+The operating scenario will include:
 
 - Acceleration
 - Cruising
 - Braking
 - Idle
 - Variable load
-
-The purpose is to avoid using artificial random current as the main representation of vehicle operation.
-
-The system will also support regenerative braking so that battery charging behavior can be represented during suitable braking events.
+- Regenerative braking
 
 ---
 
-### B. Battery Pack Model
+### B. BMS Core
 
-The project focuses on a **355-V-class Li-ion EV battery pack** or an equivalent representative model.
+The **BMS Core** is the central scope of the project.
 
-The battery representation will include the measurements and variables required for estimation and monitoring:
+It will include:
+
+**1. Measurement Processing**
+
+- Voltage
+- Current
+- Temperature
+- Cell voltage information
+
+**2. State Estimation**
+
+- SOC
+- EKF
+- Covariance
+- Estimation uncertainty
+
+**3. Battery Monitoring**
+
+- Pack state
+- Cell voltage limits
+- Cell imbalance
+- Temperature
+- Current
+- Voltage
+
+**4. Fault Management**
+
+- Over-voltage
+- Under-voltage
+- Over-temperature
+- Overcurrent
+- Cell imbalance
+- Sensor faults
+- Communication faults
+
+**5. Alarm Management**
+
+- Normal
+- Warning
+- Critical
+
+---
+
+### C. Battery Pack Model
+
+The project focuses on a **355-V-class Li-ion EV battery pack** or equivalent representative model.
+
+The battery representation will include:
 
 - Pack voltage
 - Pack current
@@ -486,50 +602,13 @@ The conceptual hierarchy is:
 
 **Cell → Module → Pack → Vehicle**
 
-For the primary real-time estimator, the battery will initially be represented using an **Equivalent Pack Model**.
-
-Cell-level behavior will be introduced selectively for monitoring and fault scenarios instead of building a full high-fidelity cell-by-cell electrochemical model.
-
-The project focuses on modeling, monitoring, state estimation, and software integration. It does not include physically manufacturing a high-voltage battery pack.
+The primary real-time EKF will use an Equivalent Pack Model.
 
 ---
 
-### C. Digital Twin
+### D. State Estimation
 
-The Digital Twin will provide a software representation of the battery system and its current operating condition.
-
-It will:
-
-- Receive real-time measurements
-- Update the battery model
-- Maintain the current digital state
-- Integrate EKF estimates
-- Track estimation uncertainty
-- Represent selected cell/module/pack information
-- Track alarms and faults
-- Maintain synchronization with the system data stream
-
-The Digital Twin will have two main operational perspectives:
-
-**Live Twin** — follows the system in real time.
-
-**Analytical Twin** — supports comparison and post-run analysis.
-
-The Analytical Twin may be used to compare:
-
-**Actual SOC vs. Estimated SOC**
-
-and:
-
-**Measured Voltage vs. Predicted Voltage**
-
-along with estimation error and uncertainty.
-
----
-
-### D. Battery State Estimation
-
-State estimation is a core part of the project.
+State estimation is a core BMS function.
 
 The scope includes:
 
@@ -542,19 +621,16 @@ The scope includes:
 - SOC estimation
 - Covariance tracking
 - Estimation error analysis
-- Reference comparison
 - Noise testing
 - Initial-condition testing
-
-The estimator will be evaluated under controlled conditions rather than only under an ideal initial state.
 
 ---
 
 ### E. Fault Injection and Abnormal Scenarios
 
-Controlled fault injection is included as part of the simulation and validation layer.
+Controlled fault injection will reproduce selected abnormal conditions.
 
-The system will be able to reproduce selected abnormal conditions such as:
+These include:
 
 **Sensor-related faults**
 
@@ -574,206 +650,137 @@ The system will be able to reproduce selected abnormal conditions such as:
 **Communication-related faults**
 
 - MQTT disconnection
-- Delayed or missing messages
+- Delayed messages
+- Missing messages
 - Communication interruption
 
-Fault injection is intended to test how the monitoring and response layers behave under controlled abnormal conditions. It does not represent a physical failure of a real battery pack.
+---
+
+### F. Digital Twin
+
+The Digital Twin will provide the software representation of the BMS-managed battery.
+
+It will:
+
+- Receive measurements
+- Update the battery model
+- Maintain the digital state
+- Integrate EKF estimates
+- Track uncertainty
+- Represent selected cell/module/pack information
+- Track faults and alarms
+- Maintain synchronization with the data stream
+
+The Digital Twin will support:
+
+**Live Twin**
+
+and
+
+**Analytical Twin**
 
 ---
 
-### F. Alarm Management
+### G. IIoT / MQTT
 
-The project includes an alarm layer with three primary severity states:
+MQTT will be the primary messaging protocol.
 
-| Level | Meaning |
-| ------------ | --------------------------------------------------------------------------------------- |
-| **NORMAL** | Parameters are within configured operating limits |
-| **WARNING** | An abnormal condition requires attention but is not yet treated as critical |
-| **CRITICAL** | A condition requires immediate attention or represents a significant system abnormality |
-
-The alarm system will provide a clear indication of:
-
-- Active alarms
-- Severity
-- Alarm source
-- Relevant value
-- Timestamp
-- Current condition
-
-The final threshold values will be defined according to the selected model, simulation assumptions, and project requirements.
-
----
-
-### G. IIoT / MQTT Communication
-
-MQTT will be used as the main messaging protocol.
-
-The communication architecture will include:
+The architecture will include:
 
 - MQTT Broker
 - Publisher/Subscriber components
-- Telemetry topics
-- Estimator/state topics
-- Alarm/fault topics
-- Command topics
-- Acknowledgement topics
-- Defined message structures
-- Update rates
+- BMS telemetry
+- State-estimation messages
+- Alarm/fault messages
+- Command messages
+- Acknowledgement messages
 - Connection monitoring
 - Reconnection handling
-
-The architecture will separate telemetry and control traffic.
-
-Representative topics include:
-
-`riri/bms/telemetry`
-
-`riri/bms/command`
-
-`riri/bms/command/ack`
-
-The exact payload schema will be defined during the implementation phase.
 
 ---
 
 ### H. Secure Industrial HMI
 
-An industrial HMI will be developed for operator-level monitoring.
+The HMI will provide operator-level BMS monitoring.
 
-It will display relevant information such as:
+It will display:
 
-- Pack voltage
-- Pack current
+- Voltage
+- Current
 - Temperature
 - SOC
-- Estimation uncertainty
-- Cell minimum/maximum voltage
+- SOC uncertainty
+- Cell voltage information
 - Cell imbalance
-- System status
+- BMS state
+- EKF state
+- Fault status
+- Alarm status
 - Communication status
-- EKF outputs
-- Active alarms
-- Warnings
-- Critical conditions
-
-The HMI will follow a high-performance industrial visualization approach, with emphasis on clear hierarchy and abnormal-condition visibility rather than decorative design.
-
-The HMI may also expose selected authorized controls where required by the simulation architecture.
 
 ---
 
 ### I. Web-Based Monitoring
 
-The web dashboard will provide remote system visibility.
+The web dashboard will provide:
 
-The dashboard will include the main live values and analytical views required to understand the system:
-
-- KPI information
-- Live measurements
+- Live BMS measurements
 - SOC
 - Estimation uncertainty
 - Time-series plots
 - Actual vs. estimated SOC
 - Measured vs. predicted voltage
-- System state
+- BMS state
 - Cell-level summary
 - Alarm status
 - Communication status
 - Historical data
 - Replay controls
 
-The web application will consume data from the backend/communication layer rather than directly interacting with low-level battery hardware.
-
 ---
 
 ### J. Replay System
 
-The system will support recording and replaying selected simulation runs.
+The system will support recording and replaying BMS/simulation runs.
 
-A run such as:
-
-**Drive Cycle #01**
-
-can be recorded and stored with its associated telemetry and state information.
-
-Later, the system can enter:
-
-**REPLAY MODE**
-
-and stream the recorded data again through the same monitoring pipeline.
-
-The goal is to create a reproducible test and demonstration environment.
+A recorded run can later be streamed again through the same BMS monitoring and Digital Twin pipeline.
 
 ---
 
 ### K. Command and Control Simulation
 
-The web interface will support a limited set of simulation commands.
+The web interface will support limited simulation commands.
 
-Examples include:
-
-- Start simulation
-- Stop simulation
-- Reset
-- Select drive cycle
-- Start replay
-- Stop replay
-
-The command path will be:
+The command path is:
 
 **Web UI → Authentication → Validation → Authorization → MQTT → Simulator**
 
-Each command must be validated before being accepted by the simulator.
-
-The telemetry path and command path will remain logically separate.
+Telemetry and command traffic will remain logically separate.
 
 ---
 
 ### L. Security
 
-The project includes prototype-level security measures.
+Prototype-level security mechanisms include:
 
-The intended architecture may include:
-
-**Client Authentication**
-
--
-
-**TLS**
-
--
-
-**MQTT ACL**
-
--
-
-**WSS**
-
--
-
-**Command Authorization**
-
--
-
-**Payload Validation**
-
-Security mechanisms will focus on protecting communication, restricting access, and preventing unauthorized or malformed commands from reaching the simulation layer.
+- Client Authentication
+- TLS
+- MQTT ACL
+- WSS
+- Command Authorization
+- Payload Validation
 
 ---
 
 ### M. System Integration and Validation
 
-The final system will connect the following layers:
+The final system will integrate:
 
 **Driving Cycle**
 
 ↓
 
-**Vehicle Speed**
-
-↓
-
-**Power Demand**
+**Vehicle/Power Model**
 
 ↓
 
@@ -781,11 +788,15 @@ The final system will connect the following layers:
 
 ↓
 
-**Measurements**
+**BMS Measurement Layer**
 
 ↓
 
 **C++ EKF**
+
+↓
+
+**BMS State & Fault Management**
 
 ↓
 
@@ -803,15 +814,9 @@ The final system will connect the following layers:
 
 **Web Dashboard**
 
-with a controlled command path in the opposite direction:
-
-**Web UI → Secure Command Path → MQTT → Simulator**
-
-The validation layer will test both normal and abnormal operation.
-
 ---
 
-## 3.2. Out of Scope
+# 3.2. Out of Scope
 
 The following are outside the primary scope of the first implementation:
 
@@ -830,19 +835,19 @@ The following are outside the primary scope of the first implementation:
 - Full SOH estimation
 - Full Remaining Useful Life (RUL) prediction
 - Advanced predictive maintenance
-- Advanced fault diagnosis beyond the defined prototype scenarios
+- Advanced fault diagnosis beyond defined prototype scenarios
 
-These topics can be considered as future extensions once the core architecture is stable.
+These may be considered as future extensions after the BMS core architecture is stable.
 
 ---
 
 # 4. Constraints
 
-## 4.1. Battery and Modeling Constraints
+## 4.1. BMS and Battery Modeling Constraints
 
-The battery model is a simplified representation of a real EV battery and cannot reproduce every electrochemical phenomenon.
+The BMS operates on a simplified representation of a real EV battery.
 
-Battery parameters may vary with:
+Battery behavior may vary with:
 
 - SOC
 - Temperature
@@ -850,40 +855,17 @@ Battery parameters may vary with:
 - Aging
 - Operating conditions
 
-The accuracy of the Digital Twin therefore depends on the quality of the selected model and its parameters.
+The Equivalent Pack Model used by the primary EKF will not reproduce every individual cell behavior.
 
-The 355-V-class value represents a **nominal voltage class**, not a constant operating voltage.
-
-Cell-to-cell differences, internal resistance variation, and cell imbalance may not be represented with full physical fidelity in the first version.
-
-The use of an Equivalent Pack Model for the EKF also means that the estimator will not reproduce every individual cell behavior.
+The 355-V-class value represents a nominal voltage class and not a constant operating voltage.
 
 ---
 
-## 4.2. Driving-Cycle Constraints
-
-A drive cycle is only a representation of real driving behavior.
-
-The quality of the resulting battery load depends on:
-
-- The selected driving profile
-- Vehicle assumptions
-- Vehicle mass and resistance parameters
-- Efficiency assumptions
-- Auxiliary loads
-- Battery model parameters
-
-Therefore, the simulated battery current should be interpreted as the output of the selected vehicle-and-battery model, not as a direct measurement from a physical EV.
-
-The model must also use a consistent sign convention so that discharge current and regenerative charging current are not confused.
-
----
-
-## 4.3. EKF Constraints
+## 4.2. EKF Constraints
 
 EKF performance depends on:
 
-- The selected battery model
+- Battery model
 - State initialization
 - Initial covariance
 - Process-noise covariance
@@ -893,19 +875,34 @@ EKF performance depends on:
 - Model mismatch
 - Numerical implementation
 
-An EKF is not guaranteed to converge under every possible combination of bad initialization, severe noise, or incorrect model parameters.
+The EKF is not guaranteed to converge under every combination of poor initialization, severe noise, or incorrect model parameters.
 
-The implementation must also remain computationally efficient enough to operate in real time.
+---
 
-Covariance values will be used to represent estimator uncertainty, but the system should not interpret covariance directly as a percentage confidence without a defined statistical mapping.
+## 4.3. BMS Fault Detection Constraints
+
+Fault injection is intentionally artificial.
+
+An injected sensor bias, temperature abnormality, or cell-voltage deviation does not reproduce every physical mechanism that causes a real battery fault.
+
+The fault layer therefore evaluates:
+
+- Detection logic
+- Alarm generation
+- Data handling
+- Visualization
+- Communication
+- System response
+
+rather than claiming physical validation of real battery failures.
 
 ---
 
 ## 4.4. Data Constraints
 
-The project may rely on simulated data, experimental data, or a combination of both.
+The project may use simulated data, experimental data, or a combination.
 
-Available datasets may contain:
+Data may contain:
 
 - Sensor noise
 - Missing samples
@@ -914,36 +911,13 @@ Available datasets may contain:
 - Limited operating conditions
 - Uncertain reference values
 
-A reliable reference SOC is required for meaningful quantitative evaluation.
-
-For simulated scenarios, the actual model SOC can act as a reference, but this should be clearly distinguished from a physically measured ground truth.
-
-The quality of the Digital Twin will therefore be constrained by the quality and coverage of the available data.
+For quantitative SOC evaluation, a reliable reference SOC is required.
 
 ---
 
-## 4.5. Fault-Injection Constraints
+## 4.5. Communication Constraints
 
-Fault injection is intentionally artificial.
-
-An injected sensor bias or abnormal cell voltage does not reproduce every physical mechanism that would cause the same fault in a real battery.
-
-The fault layer is therefore intended to test:
-
-- Detection logic
-- Alarm generation
-- Data handling
-- Visualization
-- System response
-- Communication behavior
-
-rather than to claim physical validation of real battery failure mechanisms.
-
----
-
-## 4.6. Communication Constraints
-
-MQTT communication depends on network availability, Broker behavior, and message handling.
+MQTT communication depends on network availability and Broker behavior.
 
 Potential issues include:
 
@@ -955,161 +929,130 @@ Potential issues include:
 - Out-of-order data
 - Invalid payloads
 
-The system will therefore require consistent message structures and basic reconnection handling.
+---
 
-Communication reliability will be evaluated within the limits of the prototype environment.
+## 4.6. Security Constraints
+
+The security architecture is intended for an engineering prototype.
+
+TLS, authentication, ACLs, WSS, command authorization, and payload validation do not constitute complete automotive cybersecurity certification.
 
 ---
 
-## 4.7. Security Constraints
+## 4.7. HMI and Visualization Constraints
 
-The security architecture is designed for an engineering prototype rather than a production automotive system.
+The BMS monitoring interface must remain readable as the number of monitored signals increases.
 
-TLS, authentication, ACLs, WSS, command authorization, and payload validation can significantly improve the security of the system, but they do not constitute full automotive cybersecurity compliance or certification.
-
-The project does not claim compliance with a complete production cybersecurity framework.
-
-Security testing will focus on the attack surfaces introduced by the prototype architecture, particularly telemetry access, command handling, authentication, and communication channels.
-
----
-
-## 4.8. HMI and Visualization Constraints
-
-The HMI must remain readable as the number of monitored signals increases.
-
-A large number of KPIs, alarms, graphs, and indicators can reduce usability rather than improve it.
-
-The visualization must therefore balance:
+The visualization must balance:
 
 **Information Density ↔ Operator Readability**
 
-Abnormal conditions should be visually distinguishable without relying on excessive colors, decorative graphics, gradients, or unnecessary animation.
-
-The web dashboard also has to remain responsive during real-time streaming and replay.
+Abnormal conditions must be distinguishable without excessive decorative graphics or unnecessary animation.
 
 ---
 
-## 4.9. Replay Constraints
+## 4.8. Computational Constraints
 
-Replay Mode depends on the availability and integrity of recorded runs.
-
-A replay should preserve the timing information needed to reproduce the original data stream reasonably closely.
-
-Replay is intended for:
-
-- Demonstration
-- Repeatable testing
-- Debugging
-- Comparison of algorithm versions
-- HMI and communication testing
-
-It should not be confused with a new physical experiment.
-
----
-
-## 4.10. Command and Control Constraints
-
-Commands initiated from the web interface create a second communication direction and therefore introduce additional security and reliability requirements.
-
-A command must not be accepted only because it was received.
-
-The system should verify:
-
-**Who sent it → Is the command allowed → Is the payload valid → Is the simulator in a valid state → Should the command be executed?**
-
-Commands must therefore pass through authentication, validation, and authorization before execution.
-
-The command interface will remain limited to simulation and monitoring functions and will not directly control physical high-voltage equipment.
-
----
-
-## 4.11. Computational Constraints
-
-The architecture combines several real-time components:
+The architecture combines:
 
 - Battery model
+- BMS measurement processing
 - EKF
 - Fault injection
-- MQTT communication
-- Digital Twin updates
+- Fault management
+- MQTT
+- Digital Twin
 - HMI
 - Web dashboard
 - Replay engine
 
-The system must therefore be designed so that monitoring and visualization do not interfere with the timing requirements of the estimator.
-
-The main estimator should remain computationally lightweight enough for real-time execution, which is one of the reasons the initial EKF is based on an Equivalent Pack Model rather than a full cell-level estimator.
+The BMS estimator must therefore remain computationally lightweight enough for real-time execution.
 
 ---
 
-## 4.12. Project-Level Constraints
+## 4.9. Project-Level Constraint
 
-This project is defined as a **Research/Engineering Prototype and Proof of Concept (PoC)** rather than a production automotive system.
+This project is defined as a:
 
-The priority is to build a complete, testable architecture first and only then increase its complexity.
+**Research / Engineering Prototype and Proof of Concept (PoC)**
 
-The system should remain modular so that components such as:
-
-- Battery Model
-- Drive-Cycle Generator
-- EKF
-- Fault Injector
-- MQTT Layer
-- Digital Twin
-- Alarm Manager
-- HMI
-- Web Dashboard
-- Replay Engine
-
-can be modified or replaced without redesigning the entire system.
-
-The final implementation must balance:
-
-**Estimation Accuracy**
-
--
-
-**Real-Time Performance**
-
--
-
-**EV Realism**
-
--
-
-**Communication Reliability**
-
--
-
-**Security**
-
--
-
-**Usability**
-
--
-
-**Development Complexity**
-
-The project should therefore prioritize a **working, measurable, reproducible, and technically defensible system** rather than adding features simply to make the project appear more complex.
+The priority is to build a complete, testable, measurable, reproducible, and technically defensible **BMS-oriented system** before increasing architectural complexity.
 
 ---
 
-# Final Day 0 System Boundary
+# 5. Final Day 0 System Boundary
 
 ## Inputs
 
 **Driving Cycle + Vehicle Parameters + Battery Parameters + Measurement Data + Simulation Commands**
 
-## Core Processing
+---
 
-**Vehicle/Power Model + Battery Model + C++ EKF + Fault Injection + Digital Twin + Alarm Manager + MQTT/IIoT Layer**
+## BMS Core Processing
+
+**Vehicle/Power Model**
+
+↓
+
+**Battery Model**
+
+↓
+
+**Measurement Processing**
+
+↓
+
+**C++ EKF**
+
+↓
+
+**SOC / Battery State Estimation**
+
+↓
+
+**Fault Detection**
+
+↓
+
+**Alarm Management**
+
+---
+
+## Extended System Processing
+
+**BMS Core**
+
+↓
+
+**Digital Twin**
+
+↓
+
+**MQTT / IIoT**
+
+↓
+
+**Industrial HMI + Web Dashboard**
+
+---
 
 ## Outputs
 
-**Estimated SOC + Estimation Uncertainty + Battery State + Fault/Alarm Status + Industrial HMI + Web Dashboard + Replay/Analytical Results**
+- Estimated SOC
+- Estimation uncertainty
+- Battery state
+- Cell monitoring information
+- Fault status
+- Alarm status
+- BMS status
+- Industrial HMI
+- Web Dashboard
+- Replay results
+- Analytical results
 
-## Data Flow
+---
+
+# 6. Core Data Flow
 
 **Driving Cycle**
 
@@ -1131,7 +1074,11 @@ The project should therefore prioritize a **working, measurable, reproducible, a
 
 ↓
 
-**Voltage / Current / Temperature**
+**Voltage / Current / Temperature / Cell Data**
+
+↓
+
+**BMS Measurement Layer**
 
 ↓
 
@@ -1140,6 +1087,10 @@ The project should therefore prioritize a **working, measurable, reproducible, a
 ↓
 
 **SOC + Model States + Covariance**
+
+↓
+
+**BMS State & Fault Management**
 
 ↓
 
@@ -1153,7 +1104,9 @@ The project should therefore prioritize a **working, measurable, reproducible, a
 
 **Industrial HMI + Web Dashboard**
 
-## Command Flow
+---
+
+# 7. Command Flow
 
 **Web Dashboard**
 
@@ -1181,28 +1134,31 @@ The project should therefore prioritize a **working, measurable, reproducible, a
 
 **Command ACK**
 
-## Demonstration Modes
+---
 
-**LIVE MODE**
+# 8. Demonstration Modes
 
-Real-time simulation and monitoring.
+## LIVE MODE
 
-**REPLAY MODE**
+Real-time battery simulation, BMS estimation, fault monitoring, Digital Twin synchronization, and monitoring.
 
-Reproduce a previously recorded scenario.
+## REPLAY MODE
 
-**ANALYTICAL MODE**
+Reproduction of a previously recorded BMS/simulation scenario.
 
-Compare actual/reference and estimated behavior, including:
+## ANALYTICAL MODE
 
-**Actual SOC vs. Estimated SOC**
+Comparison of:
 
-**Measured Voltage vs. Predicted Voltage**
+- Actual SOC vs. Estimated SOC
+- Measured Voltage vs. Predicted Voltage
+- Estimation Error
+- EKF Uncertainty
+- Battery response
+- Fault response
 
-**Estimation Error**
+---
 
-**EKF Uncertainty**
+# 9. Core Deliverable
 
-## Core Deliverable
-
-> **A reproducible, real-time EV battery Digital Twin prototype that connects realistic driving-cycle simulation, battery state estimation, EKF uncertainty, fault injection, MQTT/IIoT communication, secure command handling, industrial HMI, web monitoring, alarm management, and replay-based analysis into one end-to-end system.**
+> **A reproducible, real-time BMS-oriented Digital Twin prototype for a 355-V-class Li-ion EV battery pack that integrates realistic driving-cycle simulation, battery measurement processing, C++ EKF state estimation, SOC monitoring, fault detection, alarm management, Digital Twin synchronization, MQTT/IIoT communication, secure command handling, industrial HMI, web-based monitoring, and replay-based analysis into one end-to-end system.**
